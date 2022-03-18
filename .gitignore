@@ -1,0 +1,8 @@
+.env*
+.venv/
+.vscode/
+__pycache__/
+dist/
+.python-version
+breachrx-cli.pyz
+.DS_Store
