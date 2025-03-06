@@ -15,11 +15,11 @@ graphql_url = os.getenv("BREACHRX_GRAPHQL_URL", default="https://graphql.app.bre
 orgname = os.getenv("BREACHRX_ORG_NAME")
 
 def execute_query(query, variables=None):
-  if api_key == None:
+  if not api_key:
     raise Exception("BREACHRX_API_KEY environment variable not set.")
-  elif secret_key == None:
+  if not secret_key:
     raise Exception("BREACHRX_SECRET_KEY environment variable not set.")
-  elif orgname == None:
+  if not orgname:
     raise Exception("BREACHRX_ORG_NAME environment variable not set.")
     
   auth = BasicAuth(api_key, secret_key)
@@ -39,6 +39,8 @@ def execute_query(query, variables=None):
     result = client.execute(query, variable_values=variables)
   except TransportQueryError as e:
     return e.errors[0]["message"]
+  except Exception as e:
+    return str(e)
   else:
     return result
 
@@ -49,25 +51,34 @@ def cli():
 
 @cli.command()
 @click.argument("incident_name")
-@click.option("--severity", default="Unknown", help="Incident severity.")
-@click.option("--incident-type", default="Other", help="Incident type.")
 @click.option("--description", help="A brief description of the Incident.")
-def create_incident(incident_name, severity, incident_type, description):
+@click.option("--custom-identifier", help="An optional custom identifier for the Incident.")
+@click.option("--severity", default="Unknown", help="Incident severity.")
+@click.option("--state", help="The starting state for the incident. Optional, defaults to Draft.")
+@click.option("--incident-type", default="Other", help="Incident type.")
+def create_incident(incident_name, description, custom_identifier, severity, state, incident_type):
   mutation = gql("""
   mutation CreateIncident(
-    $severity: String!,
     $name: String!,
-    $type: String!,
-    $description: String
+    $description: String,
+    $customIdentifier: String,
+    $severity: String!,
+    $state: String,
+    $type: String!
   ) {
     createIncident(
-      type: $type, 
-      severity: $severity, 
       name: $name,
-      description: $description
+      description: $description,
+      customIdentifier: $customIdentifier,
+      severity: $severity, 
+      state: $state,
+      type: $type,
     ) {
       id
       name
+      description
+      customIdentifier
+      state
       severity {
         name
       }
@@ -76,15 +87,16 @@ def create_incident(incident_name, severity, incident_type, description):
           name
         }
       }
-      description
     }
   }""")
 
   params = {
-    "severity": severity,
     "name": incident_name,
+    "description": description,
+    "customIdentifier": custom_identifier,
+    "severity": severity,
+    "state": state,
     "type": incident_type,
-    "description": description
   }
 
   click.echo(execute_query(mutation, params))
@@ -101,6 +113,22 @@ def get_incident_severities():
 
   for severity in severities["incidentSeverities"]:
     click.echo(severity["name"])
+
+@cli.command()
+def get_incident_states():
+  query = gql("""{
+    state: __type(name: "State") {
+      name
+      enumValues {
+        name
+      }
+    }
+  }""")
+
+  incident_states = execute_query(query)
+
+  for incident_state in incident_states["state"]["enumValues"]:
+    click.echo(incident_state["name"])
 
 @cli.command()
 def get_incident_types():

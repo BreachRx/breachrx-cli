@@ -70,6 +70,7 @@ Development requires installing Poetry (`pip install poetry`).
 
 ```bash
 poetry install
+poetry self add poetry-plugin-export
 ```
 
 ### How to build a single python executable
